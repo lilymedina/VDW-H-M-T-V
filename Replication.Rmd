@@ -1,0 +1,1172 @@
+---
+title: 'Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
+  Complements?'
+author: 'Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey Timmons, Maarten Voors'
+date: "October 22, 2018"
+output:
+  html_document:
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_depth: 3
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup1, include=FALSE}
+rm(list=ls(all=TRUE)) 
+gc()
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This .Rmd file replicates all tables and figures used in the paper. Data comes from the local folder "data". One helper file is called up in the process from the local folder "code". Figures are put into local folder "output".
+
+```{r setup2, include=FALSE}
+
+set.seed(1)
+# install necessary packages
+pkgs <- c("readxl","haven", "geosphere","plyr" ,"dplyr","rgdal","rgeos", "magrittr", "zoo", "reshape", "tidyr", "spdep", "knitr", "stargazer", "lubridate", "parallel", "estimatr", "MASS","ggplot2", "cowplot" ,"boot","DiagrammeR", "dataverse", "readstata13", "rstan")
+lapply(pkgs, function(x) if (!require(x, character.only=T)){install.packages(x);library(x, character.only = T)})
+
+# load packages
+library(estimatr)
+library(rstan)
+```
+
+## Options
+
+Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete. 
+
+```{r options}
+
+# Stan Setup
+# 1re: model with random effects at chiefdom level
+# 2re: model with random effects at chiefdom level and village level
+
+seed <- 1
+run_1re <- FALSE
+run_2re <- FALSE
+run_posteriors <- FALSE
+
+outname_1re <- "stan_1re.Rdata"
+outname_2re <- "stan_2re.Rdata"
+
+options(mc.cores = parallel::detectCores())
+
+chains <- 20
+iters <- 4000
+max_divergent <- 0 # Maximum divervent transitions accepted
+
+```
+
+## Load Data and Helper Files
+
+```{r prep1, warning=FALSE}
+
+
+# Load data from the local folder "data"
+# The cleaning process and creation of shock variables has been kept out, 
+# as this required village-level GPS information, which cannot be made public.
+hh <- read.csv(file = "data/hh.csv")
+vill_data <- read.csv(file = "data/vill_data.csv")
+shocks <- read.csv(file = "data/shocks.csv")
+
+# Load additional helper functions
+source("code/1_helper_functions.R")
+
+```
+
+# Table 1: Measures Related to the Modern Contract
+
+```{r govern_summ}
+
+G1 <-  c( "q078_a_elections" , 
+          "q078_b_complaints" ,
+          "q078_c_suggestions" ,
+          "q078_corruption" ,
+          "q078_d_sensibiliser", 
+          "q078_f_consult", 
+          "q078_g_pork")
+G2  <-  c("q077_a_vote", 
+          "q077_b_complain",
+          "q077_c_suggest", 
+          "q077_d_meetings", 
+          "q077_e_obey", 
+          "q077_f_taxes", 
+          "q077_g_support")
+G3  <-  c("q076_edu_e", 
+          "q076_sante_e")
+G4  <-  c("q079_f_police", 
+          "q079_g_state")
+C1  <-  c("qd2_chief" , 
+          "qd6_chief" , 
+          "qd7_chief" )
+
+summ <- function(var, my_data = hh) cbind( sum(!is.na(my_data[,`var`])), 
+                                  round(mean(my_data[,`var`],na.rm = TRUE),3), 
+                                  round(sd(my_data[,`var`],  na.rm = TRUE), 3), 
+                                  min(my_data[,`var`], na.rm = TRUE),
+                                  max(my_data[,`var`], na.rm = TRUE))
+
+gvars <- data.frame(family = c("Responsibilities of the state", rep("",length(G1)),
+                                "Responsibilities of citizens", rep("",length(G2)),
+                                "Value of state activities",    rep("",length(G3)),
+                                "Citizen activities",           rep("",length(G4)),
+                                "Overall mean modern contract"),
+                    
+
+                       dep_var = c("Accept elections results", 
+                                    "React to complaints", 
+                                    "React to suggestions",
+                                    "Avoid corruption", 
+                                    "Keep people informed", 
+                                    "Consult population",
+                                    "Contribute resources",
+                                    "---Family Mean---",
+                                    "Vote",
+                                    "Complain" ,
+                                    "Make suggestions",
+                                    "Attend meetings",
+                                    "Obey the law", 
+                                    "Pay Tax",
+                                    "Support government",
+                                    "---Family Mean---",
+                                    "Providing education",
+                                    "Providing health care",
+                                    "---Family Mean---",
+                                    "Contact police",
+                                    " Visit to government agency", 
+                                   "---Family Mean---",
+                                   "")
+                                    )
+
+ gsumm <- cbind(gvars, t(sapply(c(G1, "G1", G2, "G2", G3, "G3", G4, "G4", "G"), summ)))
+
+ kable( gsumm, row.names = FALSE, col.names = c("Family", "Dependent Variable", "Obs", "Mean", "St. Dev", "Min", "Max"), digits = 3)
+ 
+```
+
+# Table 2: Measures Related to the Traditional Contract
+
+```{r chief_summ}
+
+ 
+cvars <- data.frame(family = c("Desired role of chief as development broker ",rep("",length(C1))),
+                       dep_var = c("Beneficiary choice", 
+                                    "Fund allocation", 
+                                    "Project supervision",
+                                    "---Family Mean---"))
+
+csumm <- cbind(cvars, t(sapply(c(C1, "C1"), summ)))
+    
+kable(csumm , row.names = FALSE, col.names = c("Family", "Dependent Variable", "Obs", "Mean", "St. Dev", "Min", "Max"))
+ 
+```
+
+
+# Table 3: Measures Related to the Shocks
+
+```{r shocks_summary, message=FALSE, warning=FALSE}
+
+summ2 <- function(x) c(length(x), mean(x), sd(x), min(x), max(x))
+
+shocks_summ <- sapply(list(shocks$avg_rain_dev, shocks$Confl_Shock), summ2) %>% t()
+
+rownames(shocks_summ) <- c("Rainfall Shock", "Conflict Shock")
+
+kable(shocks_summ , col.names =  c(	"Obs.", "Mean", "St. Dev."," Min" ,"Max") , digits = 3 )
+
+```
+
+
+# Table 4. Correlation between Modern and Traditional Contracts
+
+```{r corr_GC1, message=FALSE, warning=FALSE}
+
+y <- c("G1", "G2" ,"G3", "G4", "G")
+
+stargazer.lmrobust <- function(lmrobust_object, fe = "Y"){
+ rows <- 10
+ output <- rep("",rows)   
+ pvalues <- lmrobust_object$p.value[c("C1", "age", "age2", "lit", "male")]
+ stars   <- ifelse(pvalues < 0.01 ,"***", 
+                   ifelse(pvalues < 0.05 & pvalues>=0.01, "**", 
+                          ifelse(pvalues < 0.1 & pvalues>=0.05, "*", "")))
+ 
+  output[1:rows%%2!=0] <- paste0(round(lmrobust_object$coefficients[c("C1", "age", "age2", "lit", "male")],3), stars)
+  output[1:rows%%2==0] <- paste0("(", round(lmrobust_object$std.error[2:5],3), ")") # names are not recognized..need to use index
+ 
+ output <- c( output, fe, lmrobust_object$N, round(lmrobust_object$r.squared , 3))
+ 
+}
+
+
+## regressions without fixed effects 
+no_fe <- lapply(y, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ C1 + age + age2 + lit + male")), data = hh ))
+
+## regressions with fixed effects 
+fe <- lapply(y, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ C1 + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+
+## Create Correlations table 
+corrs <- cbind (sapply(no_fe, stargazer.lmrobust, fe = "N"), sapply(fe, stargazer.lmrobust))
+rownames(corrs) <- c("Desired role of chief", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+
+kable(corrs, col.names = rep(c("Resp. State" , "Resp. citizen"  , "Valuation State", "Citizen Activities","Index" ),2))
+
+```
+
+# Table A3-A14. Relationship Modern and Traditional Contracts (individual level)
+
+Script to produce tables for relationship modern and traditional contracts using individual level measures. These analyses make use of chiefdom fixed effects.
+
+```{r corr_indiv, echo=FALSE, warning=FALSE}
+
+# Indicate individual outcomes
+y_G1 <- c("q078_a_elections", "q078_b_complaints", "q078_c_suggestions", "q078_corruption", "q078_d_sensibiliser", "q078_f_consult", "q078_g_pork")
+y_G2 <-c("q077_a_vote", "q077_b_complain", "q077_c_suggest", "q077_d_meetings", "q077_e_obey","q077_f_taxes", "q077_g_support")
+y_G3 <- c("q076_edu_e", "q076_sante_e")
+y_G4 <- c("q079_f_police","q079_g_state")
+
+# Set up output code
+
+#qd2_chief
+stargazer.lmrobust_qd2 <- function(lmrobust_object, fe = "Y"){
+ rows <- 10
+ output <- rep("",rows)   
+ pvalues <- lmrobust_object$p.value[c("qd2_chief", "age", "age2", "lit", "male")]
+ stars   <- ifelse(pvalues < 0.01 ,"***", 
+                   ifelse(pvalues < 0.05 & pvalues>=0.01, "**", 
+                          ifelse(pvalues < 0.1 & pvalues>=0.05, "*", "")))
+ 
+  output[1:rows%%2!=0] <- paste0(round(lmrobust_object$coefficients[c("qd2_chief", "age", "age2", "lit", "male")],2), stars)
+  output[1:rows%%2==0] <- paste0("(", round(lmrobust_object$std.error[2:5],2), ")") # names are not recognized..need to use index
+ output <- c( output, fe, lmrobust_object$N, round(lmrobust_object$r.squared , 2))
+}
+
+#qd6_chief
+stargazer.lmrobust_qd6 <- function(lmrobust_object, fe = "Y"){
+ rows <- 10
+ output <- rep("",rows)   
+ pvalues <- lmrobust_object$p.value[c("qd6_chief", "age", "age2", "lit", "male")]
+ stars   <- ifelse(pvalues < 0.01 ,"***", 
+                   ifelse(pvalues < 0.05 & pvalues>=0.01, "**", 
+                          ifelse(pvalues < 0.1 & pvalues>=0.05, "*", "")))
+ 
+  output[1:rows%%2!=0] <- paste0(round(lmrobust_object$coefficients[c("qd6_chief", "age", "age2", "lit", "male")],2), stars)
+  output[1:rows%%2==0] <- paste0("(", round(lmrobust_object$std.error[2:5],2), ")") # names are not recognized..need to use index
+ output <- c( output, fe, lmrobust_object$N, round(lmrobust_object$r.squared , 2))
+}
+
+#qd7_chief
+stargazer.lmrobust_qd7 <- function(lmrobust_object, fe = "Y"){
+ rows <- 10
+ output <- rep("",rows)   
+ pvalues <- lmrobust_object$p.value[c("qd7_chief", "age", "age2", "lit", "male")]
+ stars   <- ifelse(pvalues < 0.01 ,"***", 
+                   ifelse(pvalues < 0.05 & pvalues>=0.01, "**", 
+                          ifelse(pvalues < 0.1 & pvalues>=0.05, "*", "")))
+ 
+  output[1:rows%%2!=0] <- paste0(round(lmrobust_object$coefficients[c("qd7_chief", "age", "age2", "lit", "male")],2), stars)
+  output[1:rows%%2==0] <- paste0("(", round(lmrobust_object$std.error[2:5],2), ")") # names are not recognized..need to use index
+ output <- c( output, fe, lmrobust_object$N, round(lmrobust_object$r.squared , 2))
+}
+
+# Note: in code below it each time overwrites: fe, corrs
+
+```
+
+## Results for Responsibilities of the State
+
+```{r, warning=FALSE}
+
+Names <- c("Accept elections results" , "React to complaints"  , "React to suggestions", "Avoid corruption","Keep people informed", "Consult population", "Contribute resources" )
+
+# Chief: Beneficiary Choice (QD2)
+fe <- lapply(y_G1, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd2_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd2, fe = "Y")
+rownames(corrs) <- c("Chief: Beneficiary Choice", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Fund Allocation (QD6)
+fe <- lapply(y_G1, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd6_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd6, fe = "Y")
+rownames(corrs) <- c("Chief: Fund Allocation", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Project Supervision (QD7)
+fe <- lapply(y_G1, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd7_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd7, fe = "Y")
+rownames(corrs) <- c("Chief: Project Supervision", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+```
+
+
+## Results for Responsibilities of Citizens
+
+```{r, warning=FALSE}
+
+Names <- c("Vote","Complain", "Make suggestions","Attend meetings", "Obey the law","Pay tax", "Support government")
+
+# Chief: Beneficiary Choice (QD2)
+fe <- lapply(y_G2, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd2_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd2, fe = "Y")
+rownames(corrs) <- c("Chief: Beneficiary Choice", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Fund Allocation (QD6)
+fe <- lapply(y_G2, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd6_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd6, fe = "Y")
+rownames(corrs) <- c("Chief: Fund Allocation", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Project Supervision (QD7)
+fe <- lapply(y_G2, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd7_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd7, fe = "Y")
+rownames(corrs) <- c("Chief: Project Supervision", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+```
+
+## Results for Valuation of the State
+
+```{r, warning=FALSE}
+
+Names <- c("Providing education" , "Providing health care")
+
+# Chief: Beneficiary Choice (QD2)
+fe <- lapply(y_G3, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd2_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd2, fe = "Y")
+rownames(corrs) <- c("Chief: Beneficiary Choice", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Fund Allocation (QD6)
+fe <- lapply(y_G3, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd6_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd6, fe = "Y")
+rownames(corrs) <- c("Chief: Fund Allocation", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Project Supervision (QD7)
+fe <- lapply(y_G3, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd7_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd7, fe = "Y")
+rownames(corrs) <- c("Chief: Project Supervision", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+```
+
+## Results for Citizen Activities
+
+```{r, warning=FALSE}
+
+Names <- c("Contact police" , "Visit to government agency")
+
+# Chief: Beneficiary Choice (QD2)
+fe <- lapply(y_G4, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd2_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd2, fe = "Y")
+rownames(corrs) <- c("Chief: Beneficiary Choice", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Fund Allocation (QD6)
+fe <- lapply(y_G4, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd6_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd6, fe = "Y")
+rownames(corrs) <- c("Chief: Fund Allocation", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+# Chief: Project Supervision (QD7)
+fe <- lapply(y_G4, function(y)
+  estimatr::lm_robust(formula = as.formula(paste0(y, "~ qd7_chief + age + age2+lit + male + as.factor(IDS_CHEF)")), data = hh ))
+corrs <- sapply(fe, stargazer.lmrobust_qd7, fe = "Y")
+rownames(corrs) <- c("Chief: Project Supervision", "", "Age", "","Age2", "","Literate", "","Male","", "FE", "N", "R2")
+corrs<-corrs[c(1:2,11:13),]
+kable(corrs, col.names = Names)
+
+```
+
+# Table 5. Structural Model Parameter Estimates
+
+The table below presents the results from estimating equations (4) and (5) in the manuscript. First, data is prepared:
+
+```{r standata}
+#write.csv(hh, file = "data_temp/hh.csv")
+stan_hh <- dplyr::filter(hh, complete.cases(IDS_CHEF, IDV, rain, confl, C1, G ))
+
+d    <- length(unique(stan_hh$IDS_CHEF))
+k    <- length(unique(stan_hh$IDV))
+
+
+stan_hh  %<>% mutate(chiefdom = as.numeric(factor(IDS_CHEF, labels = 1:d)), 
+                      village  = as.numeric(factor(IDV, labels = 1:k) ))
+            
+idv_chef <- dplyr::group_by( stan_hh,  village, chiefdom )%>%
+             dplyr::summarise(n())
+
+
+x      <- dplyr::select(stan_hh, C1,  G)
+
+n      <- nrow(x)
+
+sdata  <- list(n = n, 
+               k = k, 
+               d = d, 
+               x = x ,
+               rain  = stan_hh$rain, 
+               confl = stan_hh$confl, 
+               chiefdom = stan_hh$chiefdom , 
+               idv = stan_hh$village) # to be passed on to Stan
+
+```
+
+Next, run Stan model with random effects at the chiefdom level:
+
+```{r stan}
+
+## Random effects at chiefdom level 
+
+model_1re <- "
+// Pearson Correlation
+data { 
+int<lower=0> n;
+int<lower=0> k;
+int<lower=0> d;
+vector[2] x[n];
+vector[n] rain;
+vector[n] confl;
+int chiefdom[n];
+int idv[n];
+
+
+}
+parameters {
+real<lower=0.1>        CES;
+vector<lower=0.001>[2]     sigma;
+real<lower=-.999,upper=.999> r;
+real  a_g;
+real  b_g;
+real  g_g;
+real  a_c;
+real  b_c;
+real  g_c;
+
+real <lower=0.001> sigma_fe_g;
+
+vector[d] fe_g;
+
+
+real <lower=0.001> sigma_fe_c;
+
+vector[d] fe_c;
+
+
+
+} 
+
+transformed parameters {
+
+cov_matrix[2] Sigma;
+
+// Reparameterization
+Sigma[1,1] = square(sigma[1]);
+Sigma[1,2] = r * sigma[1] * sigma[2];
+Sigma[2,1] = r * sigma[1] * sigma[2];
+Sigma[2,2] = square(sigma[2]);
+
+}
+
+model {
+vector[2]  s[n];
+vector[n]  v_g;
+vector[n]  v_c;
+
+v_c =  exp(a_c + b_c*rain + g_c*confl);
+v_g =  exp(a_g + b_g*rain + g_g*confl);
+
+for (j in 1:n) {
+s[j,1] = (v_c[j]^(CES))/(v_c[j]^(CES-1) + v_g[j]^(CES-1)) +   fe_c[chiefdom[j]] ; 
+s[j,2] = (v_g[j]^(CES))/(v_c[j]^(CES-1) + v_g[j]^(CES-1)) +   fe_g[chiefdom[j]] ;
+} ;
+
+
+
+  // Chiefdom level
+    fe_g ~ normal(0, sigma_fe_g);
+    fe_c ~ normal(0, sigma_fe_c);
+    
+  // Data
+   x ~ multi_normal(s,   Sigma);
+
+}
+"
+```
+```{r stan_run1}
+if(run_1re){
+samples <- stan(model_code = model_1re,   
+                # file = "model_1re.stan",
+                data    = sdata, 
+                iter    = iters, 
+                chains  = 4, 
+                thin    = 2,
+                refresh = 10, 
+                control = list(adapt_delta = 0.99))
+save(samples, file = outname_1re)}
+
+```
+
+Next, run Stan model with random effects at the chiefdom level and the village level:
+
+```{r stan_model,include = TRUE}
+
+# Random effects at chiefdom and village level
+
+model_2re <- "
+// Pearson Correlation
+data { 
+int<lower=0> n;
+int<lower=0> k;
+int<lower=0> d;
+vector[2] x[n];
+vector[n] rain;
+vector[n] confl;
+int chiefdom[n];
+int idv[n];
+
+}
+parameters {
+real<lower=0.1>        CES;
+vector<lower=0.001>[2]     sigma;
+real<lower=-.999,upper=.999> r;
+real  a_g;
+real  b_g;
+real  g_g;
+real  a_c;
+real  b_c;
+real  g_c;
+
+real <lower=0.001> sigma_fe_g;
+real <lower=0.001> sigma_re_g;
+vector[d] fe_g;
+vector[k] re_g;
+
+real <lower=0.001> sigma_fe_c;
+real <lower=0.001> sigma_re_c;
+vector[d] fe_c;
+vector[k] re_c;
+
+
+
+} 
+
+transformed parameters {
+
+cov_matrix[2] Sigma;
+
+// Reparameterization
+Sigma[1,1] = square(sigma[1]);
+Sigma[1,2] = r * sigma[1] * sigma[2];
+Sigma[2,1] = r * sigma[1] * sigma[2];
+Sigma[2,2] = square(sigma[2]);
+
+}
+
+model {
+vector[2]  s[n];
+vector[n]  v_g;
+vector[n]  v_c;
+
+v_c =  exp(a_c + b_c*rain  + g_c*confl);
+v_g =  exp(a_g + b_g*rain  + g_g*confl);
+
+for (j in 1:n) {
+s[j,1] = (v_c[j]^(CES))/(v_c[j]^(CES-1) + v_g[j]^(CES-1)) +   fe_c[chiefdom[j]] +  re_c[idv[j]]  ; 
+s[j,2] = (v_g[j]^(CES))/(v_c[j]^(CES-1) + v_g[j]^(CES-1)) +   fe_g[chiefdom[j]]  + re_g[idv[j]] ;
+} ;
+
+//  Model
+  // IDV RE level
+
+    re_c  ~  normal(0, sigma_re_c);
+    re_g  ~  normal(0, sigma_re_g);
+  
+    
+  // Chiefdom level
+    fe_g ~ normal(0, sigma_fe_g);
+    fe_c ~ normal(0, sigma_fe_c);
+    
+  // Data
+   x ~ multi_normal(s, Sigma);
+
+}
+"
+
+if(run_2re){
+samples <- stan(model_code=model_2re,   
+                data    = sdata, 
+                iter    = iters, 
+                chains  = 4, 
+                thin    = 2,
+                refresh = 10, 
+                control = list(adapt_delta = 0.99))
+save(samples, file = outname_2re)}
+
+```
+
+
+
+We run the structural model using Stan with $n =$ ```r chains``` Markov chains and only select those chains that had less than ```r max_divergent``` divergent iterations. Lastly, we compute estimates using draws from the posterior distribution that were extracted from the selected chains.
+
+```{r discard_divergences }
+
+# Model 1 FE
+load(outname_1re) 
+divergent <-sapply(1:chains, function(i)
+	get_sampler_params(samples, inc_warmup=FALSE)[[i]][,'divergent__'])
+
+# Divergences by chain
+chains_1re <- which( colSums(divergent) <= max_divergent)
+
+
+# Model 2 FE
+load(outname_2re) 
+divergent <-sapply(1:chains, function(i)
+	get_sampler_params(samples, inc_warmup=FALSE)[[i]][,'divergent__'])
+
+
+# Divergences by chain
+chains_2re <- which( colSums(divergent) <= max_divergent)
+
+
+```
+
+
+
+
+```{r tidy_stan, echo = FALSE}
+
+set.seed(seed)
+
+n_models  <- 2
+get_bpos <- function(stanfit, chains) {
+load(stanfit) 
+#sims <- samples@sim$samples
+#par_names <- names(sims[[1]])
+
+# Remove elements from chains that were discarded 
+samples@sim$samples <- samples@sim$samples[chains]
+samples@sim$chains  <- length(chains)
+samples@sim$n_save  <-  samples@sim$n_save[chains]
+samples@sim$warmup2 <-  samples@sim$warmup2[chains]
+samples@sim$permutation <- samples@sim$permutation[chains]
+samples@inits <- samples@inits[chains]
+samples@stan_args <- samples@stan_args[chains]
+
+
+# stack samples
+#posterior <-lapply(par_names, function(parameter)
+	#  do.call(c, lapply(chains, function(chain)
+	#      sims[[chain]][[parameter]])))
+#names(posterior) <- par_names
+
+#as.data.frame(posterior)
+
+ rstan::extract(samples, permuted = TRUE)
+}
+
+gen_est <- function(posterior, quant){
+  
+  x <- posterior[, c("CES", "Sigma.1.1", "Sigma.2.2", "Sigma.1.2",
+             "a_g", "b_g", "g_g",
+             "a_c", "b_c", "g_c")]
+
+  if(quant == 1) output <-  round(apply(x, 2,  mean),3)
+  if(quant == 2) output <-  round(apply(x, 2, function(j) quantile(j, probs = 0.025)),3)
+  if(quant == 3) output <-  round(apply(x, 2, function(j) quantile(j, probs = 0.975)),3)
+  # 
+  output
+}
+
+y <- list(outname_1re, outname_2re)
+
+
+posteriors1_re <-  get_bpos(outname_1re, chains_1re)
+posteriors2_re <-  get_bpos(outname_2re, chains_2re)
+
+posteriors1_re_ <- x <- dplyr::select(as.data.frame(posteriors1_re),
+                                    CES, Sigma.1.1, Sigma.2.2,Sigma.1.2,
+                                    a_g, b_g, g_g, 
+                                    a_c, b_c, g_c)
+
+posteriors2_re_ <- x <- dplyr::select(as.data.frame(posteriors2_re),
+                                    CES, Sigma.1.1, Sigma.2.2,Sigma.1.2,
+                                    a_g, b_g, g_g, 
+                                    a_c, b_c, g_c)
+
+
+est <-  sapply(list(posteriors1_re_ , posteriors2_re_ ), gen_est, 1)
+lwr <-  sapply(list(posteriors1_re_ , posteriors2_re_ ), gen_est, 2)
+upr <-  sapply(list(posteriors1_re_ , posteriors2_re_ ), gen_est, 3)
+
+n_models <- length(y)
+params <- c("$\\sigma$", "\\hline$\\sigma_c$",  "$\\sigma_g$", "$\\sigma_{gc}$", 
+          "\\hline$\\alpha_g$", "$\\beta_g$", "$\\gamma_g$",
+          "\\hline$\\alpha_c$", "$\\beta_c$", "$\\gamma_c$")
+
+
+definition <- c("CES parameter", "Variance on $g$",  "Variance on $c$", "Covariance on $g,c$", 
+          "State intercept", "Rain shock (State)", "Conflict shock (State)",
+          "Chief intercept", "Rain shock (Chief)", "Conflict shock (Chief)")
+
+
+a <- cbind(params, definition, est)
+
+b <- matrix(paste0("(", lwr, ", ", upr, ")"), 10 , n_models)
+
+tab5 <- matrix(" ", 20, 2+n_models)
+
+for(j in 1:10) {tab5[2*j -1,] <- a[j,]; tab5[2*j,] <- c(" ", " ", b[j,])}
+
+  
+
+```
+
+
+
+
+
+```{r kable_stan}
+
+
+kable(tab5, col.names = c("Parameter", "Definition", "(i)", "(ii)"), row.names = FALSE, caption = "\\label{table:params} Structural model parameter estimates. Columns (i) and (ii) show, repectively, parameter estimates for model with random effects at the chiefdom level and for a model with random effects at the chiefdom and village level. Credibility intervals in parentheses.", align = c("clccccc"))
+
+```
+
+# Figure A1: Mediation Effects of Valuations on Support for the Rain Shock
+
+```{r prepdata_med}
+
+
+n         <- nrow(stan_hh )
+n_sims    <- 1000
+out <- posteriors1_re
+
+
+Sigma3    <- dplyr::select(as.data.frame(out),  Sigma.1.1 = Sigma.1.1,
+                                                Sigma.2.2 = Sigma.2.2,
+                                                Sigma.1.2 = Sigma.1.2) %>% as.matrix()
+
+Rain_low  <- cbind(1, quantile(stan_hh$rain, probs = 0.025),stan_hh $confl )
+Rain_high <- cbind(1, quantile(stan_hh$rain, probs = 0.975), stan_hh $confl)
+Conflict_low  <- cbind(1, stan_hh $rain, quantile(stan_hh $confl, probs = 0.025))
+Conflict_high <- cbind(1, stan_hh $rain, quantile(stan_hh $confl, probs = 0.0975))
+
+```
+
+```{r grab_posteriors}
+
+
+# Letting changes in the rain shock from low to high only affect v_C while holding v_G fixed at low levels of rain
+
+gen_posteriors <- function(n_sims,   low, high){
+  
+  v_given_shock <- function(s, shock, authority ){
+  if(authority == "c") coeff <-  c(out$a_c[s], out$b_c[s], out$g_c[s])
+  if(authority == "g") coeff <-  c(out$a_g[s], out$b_g[s], out$g_g[s])
+  exp(shock%*%coeff)
+}
+
+out$v_c_low  <- sapply(1:n_sims, v_given_shock, shock = low, authority = "c")
+out$v_c_high <- sapply(1:n_sims, v_given_shock, shock = high, authority = "c")
+out$v_g_low  <- sapply(1:n_sims, v_given_shock, shock = low, authority = "g")
+out$v_g_high <- sapply(1:n_sims, v_given_shock, shock = high, authority = "g")
+
+
+
+s_G_low_vc   <- with( out, sapply(1:n_sims, function(s){
+              
+              (v_g_low[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s])   }))
+
+s_G_high_vc   <- with( out, sapply(1:n_sims, function(s){
+              (v_g_low[,s]^(CES[s]))/(v_c_high[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+s_C_low_vc   <- with( out, sapply(1:n_sims, function(s){
+              (v_c_low[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+s_C_high_vc   <- with( out, sapply(1:n_sims, function(s){
+               (v_c_high[,s]^(CES[s]))/(v_c_high[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+
+s_G_low_vg   <- with( out, sapply(1:n_sims, function(s){
+              (v_g_low[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+s_G_high_vg   <- with( out, sapply(1:n_sims, function(s){
+              (v_g_high[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_high[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+s_C_low_vg   <- with( out, sapply(1:n_sims, function(s){
+              (v_c_low[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_low[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+s_C_high_vg   <- with( out, sapply(1:n_sims, function(s){
+               (v_c_low[,s]^(CES[s]))/(v_c_low[,s]^(CES[s]-1) + v_g_high[,s]^(CES[s]-1)) + rnorm(n, mean = 0, sd = sigma_fe_g[s]) }))
+
+simx_low_vc   <- lapply(1:n_sims, function(s){
+          vcv <-  cbind(rbind(Sigma3[s, 1],Sigma3[s,3]) , rbind(Sigma3[s,3],Sigma3[s,2] ))
+          rx <- sapply(1:n, function(i){
+          mvrnorm(1, cbind(s_C_low_vc[i,s], s_G_low_vc[i, s]), vcv ) })
+          t(rx)  })
+
+simx_high_vc   <- lapply(1:n_sims, function(s){
+          vcv <-  cbind(rbind(Sigma3[s, 1],Sigma3[s,3]) , rbind(Sigma3[s,3],Sigma3[s,2] ))
+          rx <- sapply(1:n, function(i){
+          mvrnorm(1, cbind(s_C_high_vc[i,s], s_G_high_vc[i, s]), vcv ) })
+          t(rx)  })
+
+simx_low_vg   <- lapply(1:n_sims, function(s){
+          vcv <-  cbind(rbind(Sigma3[s, 1],Sigma3[s,3]) , rbind(Sigma3[s,3],Sigma3[s,2] ))
+          rx <- sapply(1:n, function(i){
+          mvrnorm(1, cbind(s_C_low_vg[i,s], s_G_low_vg[i, s]), vcv ) })
+          t(rx)  })
+
+simx_high_vg   <- lapply(1:n_sims, function(s){
+          vcv <-  cbind(rbind(Sigma3[s, 1],Sigma3[s,3]) , rbind(Sigma3[s,3],Sigma3[s,2] ))
+          rx <- sapply(1:n, function(i){
+          mvrnorm(1, cbind(s_C_high_vg[i,s], s_G_high_vg[i, s]), vcv ) })
+          t(rx)  })
+
+# Output simulations ALL
+s_C_low_vc   <- t(sapply(1:n_sims, function(i) simx_low_vc[[i]][,1]))
+s_G_low_vc   <- t(sapply(1:n_sims, function(i) simx_low_vc[[i]][,2]))
+s_C_high_vc  <- t(sapply(1:n_sims, function(i) simx_high_vc[[i]][,1]))
+s_G_high_vc  <- t(sapply(1:n_sims, function(i) simx_high_vc[[i]][,2]))
+
+s_C_low_vg   <- t(sapply(1:n_sims, function(i) simx_low_vg[[i]][,1]))
+s_G_low_vg   <- t(sapply(1:n_sims, function(i) simx_low_vg[[i]][,2]))
+s_C_high_vg  <- t(sapply(1:n_sims, function(i) simx_high_vg[[i]][,1]))
+s_G_high_vg  <- t(sapply(1:n_sims, function(i) simx_high_vg[[i]][,2]))
+
+# Creates long dataframe nrow = 1000+ 1000; first 1000 rows: posteriors given low levels of shocks; rows 1001:2000 posterior hihg levels of shocks
+
+               data.frame(v_c           = c(colMeans(out$v_c_low),
+                                          colMeans(out$v_c_high)), 
+                        v_g           = c(colMeans(out$v_g_low),
+                                          colMeans(out$v_g_high)), 
+                        sG_given_vc  = c(rowMeans(s_G_low_vc),
+                                          rowMeans((s_G_high_vc))),
+                        sG_given_vg  = c(rowMeans(s_G_low_vg),
+                                          rowMeans((s_G_high_vg))),
+                        sC_given_vc  = c(rowMeans(s_C_low_vc),
+                                          rowMeans((s_C_high_vc))),
+                        sC_given_vg  = c(rowMeans(s_C_low_vg),
+                                          rowMeans((s_C_high_vg))),
+                        level = c(rep("low", n_sims), rep("high", n_sims)))
+
+}
+ 
+```
+
+
+
+```{r figs, include=TRUE}
+
+set.seed(1)
+
+if(run_posteriors){ 
+rain_med_DF  <- gen_posteriors(n_sims, low = Rain_low,     high = Rain_high)    
+confl_med_DF <- gen_posteriors(n_sims, low = Conflict_low, high = Conflict_high) 
+
+save(rain_med_DF,  file = "posterior_rain.Rdata")
+save(confl_med_DF, file = "posterior_confl.Rdata")
+}
+
+
+load("posterior_rain.Rdata")
+load("posterior_confl.Rdata")
+                  
+direct_rain_sg <- ggplot(data = rain_med_DF, aes(x = v_g, y =  sG_given_vg )) +
+  xlab(expression('Valuation'[g])) +
+  ylab(expression('Support'[g])) +
+  ggtitle("Within effects" , subtitle = NULL) +
+  ylim(0.1, 0.7) +
+  geom_point(aes(color = level), alpha = 0.5) +
+  scale_color_manual(values = c("grey3", "grey69"))+
+  theme(legend.position="none")
+   
+
+indirect_rain_sg <- ggplot(data = rain_med_DF) +
+  geom_point(aes(x = v_c, y =  sG_given_vc, color = level), alpha = 0.5) +
+  ylim(0.1, 0.7) +
+  xlab(expression('Valuation'[c]))  +
+  ggtitle("Across effects", subtitle = NULL) +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  scale_color_manual(values = c("grey3", "grey69"))   +
+  theme(panel.background=element_rect(fill = "white")) +
+  theme(legend.position="none")
+
+
+direct_rain_sc <- ggplot(data = rain_med_DF , aes(x = v_c, y =  sC_given_vc )) +
+  xlab(expression('Valuation'[c])) +
+  ylab(expression('Support'[c])) +
+  ylim(0.1, 1.2) +
+  geom_point(aes(color = level),  alpha = 0.5) +
+  scale_color_manual(values = c("grey3", "grey69"))+
+  theme(legend.position="none")
+   
+
+indirect_rain_sc <- ggplot(data = rain_med_DF , aes(x = v_g, y =  sC_given_vg )) +
+   xlab(expression('Valuation'[g]))  +
+   theme(axis.title.y=element_blank(),
+   axis.text.y=element_blank(),
+   axis.ticks.y=element_blank()) +
+   ylim(0.1, 1.2) +
+   geom_point(aes(color = level),  alpha = 0.5)+
+   scale_color_manual(values = c("grey3", "grey69"))   +
+   theme(legend.position="none")
+
+f1 <- plot_grid(direct_rain_sg, indirect_rain_sg, direct_rain_sc, indirect_rain_sc, rel_widths=c(1,0.9))
+
+png(filename = "mediation1.png")
+f1
+dev.off()
+f1
+
+  pdf("output/FigA1_Rain.pdf", width = 8, height = 8)
+  f1
+  dev.off()
+
+
+```
+
+
+## Table 6. The Impact of Complementarity: Within and Across Effects (Rain)
+
+```{r rain_int}
+
+# Confidence Intervals Rain
+low <- rain_med_DF[rain_med_DF$level == "low", c("v_c", "v_g", "sG_given_vg", "sG_given_vc", "sC_given_vc", "sC_given_vg" )]
+
+high <- rain_med_DF[rain_med_DF$level == "high",c("v_c", "v_g", "sG_given_vg", "sG_given_vc", "sC_given_vc", "sC_given_vg" ) ]
+
+# low
+apply(low, 2, quantile, probs = c(0.025, 0.5, 0.975))
+
+# high
+apply(high, 2, quantile, probs = c(0.025, 0.5, 0.975))
+
+ACME <-   high - low
+
+# Difference in mean CI
+kable(apply(ACME, 2, quantile, probs = c(0.025, 0.5, 0.975)), digits = 4)
+
+```
+
+
+
+# Figure A2: Mediation Effects of Valuations on Support for the Conflict Shock
+
+
+```{r confl_fig, echo=TRUE, include=TRUE}
+
+png(filename = "mediation2.png")
+
+direct_conflict_sg <- ggplot(data = confl_med_DF , aes(x = v_g, y =  sG_given_vg )) +
+  xlab(expression('Valuation'[g])) +
+  ylab(expression('Support'[g])) +
+  ggtitle("Within effects" , subtitle = NULL) +
+  geom_point(aes(color = level),  alpha = 0.5) +
+  scale_color_manual(values = c("grey3", "grey69"))+
+  theme(legend.position="none")
+   
+indirect_conflict_sg <- ggplot(data = confl_med_DF , aes(x = v_c, y =  sG_given_vc )) +
+ xlab(expression('Valuation'[c]))  +
+ theme(axis.title.y=element_blank(),
+ axis.text.y=element_blank(),
+ axis.ticks.y=element_blank()) +
+ ggtitle("Across effects", subtitle = NULL) +
+ geom_point(aes(color = level),  alpha = 0.5)+
+ scale_color_manual(values = c("grey3", "grey69"))   +
+ theme(legend.position="none")
+
+direct_conflict_sc <- ggplot(data = confl_med_DF , aes(x = v_c, y =  sC_given_vc )) +
+  xlab(expression('Valuation'[c])) +
+  ylab((expression('Support'[c])) ) +
+  geom_point(aes(color = level),  alpha = 0.5) +
+  scale_color_manual(values = c("grey3", "grey69"))+
+  theme(legend.position="none")
+   
+indirect_conflict_sc <- ggplot(data = confl_med_DF , aes(x = v_g, y =  sC_given_vg )) +
+  xlab((expression('Valuation'[g])) )  +
+  theme(axis.title.y=element_blank(),
+  axis.text.y=element_blank(),
+  axis.ticks.y=element_blank()) +
+  ylim(0.2, 0.8) +
+  geom_point(aes(color = level),  alpha = 0.5)+
+  scale_color_manual(values = c("grey3", "grey69"))   +
+  theme(legend.position="none")
+
+# Change the line type
+f2 <- cowplot::plot_grid(direct_conflict_sg, indirect_conflict_sg, direct_conflict_sc, indirect_conflict_sc ,rel_widths=c(1,0.9) )
+
+f2
+dev.off()
+f2
+
+  pdf("output/FigA2_Conflict.pdf", width = 8, height = 8)
+  f2
+  dev.off()
+
+```
+
+## Table A15. The Impact of Complementarity: Within and Across Effects (Conflict)
+
+```{r confl_ci}
+
+# Confidence Intervals Conflict
+
+l <- confl_med_DF[confl_med_DF$level=="low",  c("v_c", "v_g", "sG_given_vg", "sG_given_vc", "sC_given_vc", "sC_given_vg" )]   
+h <- confl_med_DF[confl_med_DF$level=="high", c("v_c", "v_g", "sG_given_vg", "sG_given_vc", "sC_given_vc", "sC_given_vg")]
+
+# High
+round(apply(h, 2, quantile, probs = c(0.025, 0.5, 0.975)), 4)
+# Low
+round(apply(l, 2, quantile, probs = c(0.025, 0.5, 0.975)), 4)
+
+kable((apply(h - l, 2, quantile, probs = c(0.025, 0.5, 0.975))), digits = 4)
+```
+
+
+
+# Table A1. Additional Summary Information
+
+```{r}
+
+# Chief activities
+
+chief_activities <-  c("cq057_a_managed_conflict", 
+                       "cq058_a_conflict_same_locality", 
+                       "cq059_a_conflict_different_local", 
+                       "cq060_a_stealing", 
+                       "cq061_a_legal_problems", 
+                       "cq062_a_between_villagers", 
+                       "cq063_a_social", 
+                       "cq073_a_marriage", 
+                       "cq074_a_other_activities")
+
+gvars <- data.frame(family  = c("Chief Activities", rep("",length(chief_activities)-1)),
+                    dep_var = c("Manage local conflict", 
+                                "Manage conflict between villages", 
+                                "Manage external conflict",
+                                "Managed stealing problems", 
+                                "Managed marriage problems", 
+                                "Managed local violence",
+                                "Managed social violence",
+                                "Conduct wedding/ baptism/ etc",
+                                "Other" ))
+
+ gsumm_vill <- cbind(gvars, t(sapply(chief_activities, summ, my_data = hh )))
+
+# Individual Characteristics
+ 
+ 
+ gvars <- data.frame(family  = c("Individual characteristics", rep("",2)),
+                    dep_var = c("Age (x10)", 
+                                "Literacy", 
+                                "Male" ))
+
+ gsumm_ind <- cbind(gvars, t(sapply(c("age", "lit", "male"), summ )))
+
+kable( rbind(gsumm_vill, gsumm_ind ), 
+       row.names = FALSE, 
+       col.names = c("Level", "Description", "Obs", "Mean", "St. Dev", "Min", "Max"),
+       digits = 3)
+```
+
+# Appendix C. Attrition and Missing Responses
+
+We presents the number of targeted and actually visited villages. We consider a village as visited if at least one household survey was collected in that village or a chief survey.
+
+```{r}
+
+# Number of villages visited
+# Use the variable answered for all households where data was collected (q11)
+# Same for chief survey (cq7)
+
+q11 <- aggregate(q011_sex ~ IDV, data = hh, function(x) {sum(!is.na(x))}, na.action = NULL)
+colnames(q11) <- c("IDV","q11")
+vill_data <- merge(vill_data, q11, by="IDV", all=TRUE)  
+vill_data$StepD  <- (!(vill_data$cq007_date=="") | vill_data$q11>0)
+villages_visited <- length(vill_data$StepD[vill_data$StepD==1])
+
+vill_data$Province[vill_data$IDV < 50000] <-"SK"
+vill_data$Province[vill_data$IDV < 40000] <-"TG"
+vill_data$Province[vill_data$IDV < 30000] <-"MN"
+vill_data$Province[vill_data$IDV < 20000] <-"HK"
+
+villages_visited
+
+table(vill_data$StepD, vill_data$Province)
+
+```
+
+Number of households for which we collected data.
+
+```{r}
+
+# Number of households visited
+
+length(hh$q011_sex[!is.na(hh$q011_sex) & hh$IDS_TYPES=="DML"])    
+
+```
+
+Next, we regress village attrition on our rainfall and conflict shock variables. 
+
+```{r, warning=FALSE}
+
+# Create missing village variable
+vill_data$vill_notvisited <- 1-vill_data$StepD
+table(vill_data$vill_notvisited, vill_data$StepD)
+```
+
+Results for rainfall shock:
+```{r, warning=FALSE}
+
+res_rain <- estimatr::lm_robust(vill_notvisited ~ avg_rain_dev + as.factor(IDS_CHEF), data = vill_data)
+summary(res_rain)$coefficients[2,1:3]
+
+```
+
+
+Result for conflict shock:
+```{r, warning=FALSE}
+
+res_conflict <- estimatr::lm_robust(vill_notvisited ~ Confl_Shock + as.factor(IDS_CHEF), data = vill_data )
+summary(res_conflict)$coefficients[2,1:3]
+
+
+```
+
+
+This concludes the replication file.
