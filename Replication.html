@@ -178,14 +178,13 @@ $(document).ready(function () {
 </ul>
 </div>
 
-<p>[data]: [code]: [output]: [online]: [“<em>Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</em>”]: <a href="https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full" class="uri">https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full</a></p>
 <ul>
-<li><a href="https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd">This .Rmd file</a> replicates all tables and figures reported in the manuscript [“<em>Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</em>”].</li>
-<li>Data comes from the local folder “[data]”. Helper functions are called up in the process from the local folder “[code]”. Figures are put into local folder “[output]”.</li>
+<li><a href="https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd">This .Rmd file</a> replicates all tables and figures reported in the manuscript <a href="https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full">“<em>Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</em>”</a>.</li>
+<li>Data comes from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/data">data</a>”. Helper functions are called up in the process from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/code">code</a>”. Figures are put into local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/output">output</a>”.</li>
 </ul>
-<p>You can find</p>
+<p><a href="http://www.macartan.nyc/wp-content/uploads/2018/11/VDW-H-M-T-V_paper.pdf">A pre-printed version of the paper</a> can be found online.</p>
 <div id="options" class="section level4">
-<h4><span class="header-section-number">0.0.0.1</span> Options</h4>
+<h4><span class="header-section-number"></span> Options</h4>
 <p>Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Stan Setup</span>
 <span class="co"># 1re: model with random effects at chiefdom level</span>
@@ -206,7 +205,7 @@ iters &lt;-<span class="st"> </span><span class="dv">4000</span>
 max_divergent &lt;-<span class="st"> </span><span class="dv">0</span> <span class="co"># Maximum divervent transitions accepted</span></code></pre></div>
 </div>
 <div id="load-data-and-helper-files" class="section level4">
-<h4><span class="header-section-number">0.0.0.2</span> Load Data and Helper Files</h4>
+<h4><span class="header-section-number"></span> Load Data and Helper Files</h4>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Load data from the local folder &quot;data&quot;</span>
 <span class="co"># The cleaning process and creation of shock variables has been kept out, </span>
 <span class="co"># as this required village-level GPS information, which cannot be made public.</span>

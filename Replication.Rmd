@@ -21,18 +21,19 @@ gc()
 knitr::opts_chunk$set(echo = TRUE)
 ```
 [This .Rmd file]: https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd 
-[data]:
-[code]:
-[output]:
-[online]:
+[data]: https://github.com/medinali/VDW-H-M-T-V/tree/master/data
+[code]: https://github.com/medinali/VDW-H-M-T-V/tree/master/code
+[output]: https://github.com/medinali/VDW-H-M-T-V/tree/master/output
 ["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
   Complements?_"]: https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full
-  
+[A pre-printed version of the paper]: http://www.macartan.nyc/wp-content/uploads/2018/11/VDW-H-M-T-V_paper.pdf
+
+
 * [This .Rmd file] replicates all tables and figures reported in the manuscript ["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
   Complements?_"].
 * Data comes from the local folder "[data]". Helper functions are called up in the process from the local folder "[code]". Figures are put into local folder "[output]".
 
-You can find
+[A pre-printed version of the paper] can be found online.
 
 ```{r setup2, include=FALSE}
 
@@ -57,9 +58,9 @@ Indicate your preferences here. Fyi, the structural model (which can be turned o
 # 2re: model with random effects at chiefdom level and village level
 
 seed <- 1
-run_1re <- FALSE
-run_2re <- FALSE
-run_posteriors <- FALSE
+run_1re <- TRUE
+run_2re <- TRUE
+run_posteriors <- TRUE
 
 outname_1re <- "stan_1re.Rdata"
 outname_2re <- "stan_2re.Rdata"
