@@ -1,7 +1,7 @@
 ---
 title: 'Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
   Complements?'
-author: 'Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey Timmons, Maarten Voors'
+author: 'Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey Timmons, and Maarten Voors'
 date: "October 22, 2018"
 output:
   html_document:
@@ -27,13 +27,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
   Complements?_"]: https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full
 [A pre-printed version of the paper]: http://www.macartan.nyc/wp-content/uploads/2018/11/VDW-H-M-T-V_paper.pdf
+[here]: https://www.dropbox.com/sh/1knr88h3m0zagc9/AABcxXXQEqN8RgIx7_1LaO1Ga?dl=0
 
 
 * [This .Rmd file] replicates all tables and figures reported in the manuscript ["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
   Complements?_"].
 * Data comes from the local folder "[data]". Helper functions are called up in the process from the local folder "[code]". Figures are put into local folder "[output]".
-
-[A pre-printed version of the paper] can be found online.
+* [A pre-printed version of the paper] can be found online.
 
 ```{r setup2, include=FALSE}
 
@@ -49,7 +49,7 @@ library(rstan)
 
 #### Options
 
-Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete. 
+Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete. The results from the fitted models can be found [here]. You need to download these files to your local folder whenever `run_1re`  or `run_2re` are set to FALSE.
 
 ```{r options}
 
@@ -58,9 +58,11 @@ Indicate your preferences here. Fyi, the structural model (which can be turned o
 # 2re: model with random effects at chiefdom level and village level
 
 seed <- 1
-run_1re <- TRUE
-run_2re <- TRUE
-run_posteriors <- TRUE
+# Run structural model
+run_1re <- FALSE
+run_2re <- FALSE
+# Simulate samples of the posterior predictive distribution
+run_posteriors <- FALSE
 
 outname_1re <- "stan_1re.Rdata"
 outname_2re <- "stan_2re.Rdata"

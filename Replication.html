@@ -71,25 +71,25 @@ code > span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Inf
 
 <style type="text/css">
 h1 {
-  font-size: 34px;
+  font-size: 32px;
 }
 h1.title {
-  font-size: 38px;
+  font-size: 36px;
 }
 h2 {
   font-size: 30px;
 }
 h3 {
-  font-size: 24px;
+  font-size: 22px;
 }
 h4 {
-  font-size: 18px;
-}
-h5 {
   font-size: 16px;
 }
+h5 {
+  font-size: 14px;
+}
 h6 {
-  font-size: 12px;
+  font-size: 10px;
 }
 .table th:not([align]) {
   text-align: left;
@@ -149,12 +149,19 @@ $(document).ready(function () {
 
 
 <h1 class="title toc-ignore">Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</h1>
-<h4 class="author"><em>Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey Timmons, Maarten Voors</em></h4>
+<h4 class="author"><em>Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey Timmons, and Maarten Voors</em></h4>
 <h4 class="date"><em>October 22, 2018</em></h4>
 
+
+<ul>
+<li><a href="https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd">This .Rmd file</a> replicates all tables and figures reported in the manuscript <a href="https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full">“<em>Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</em>”</a>.</li>
+<li>Data comes from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/data">data</a>”. Helper functions are called up in the process from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/code">code</a>”. Figures are put into local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/output">output</a>”.</li>
+<li><a href="http://www.macartan.nyc/wp-content/uploads/2018/11/VDW-H-M-T-V_paper.pdf">A pre-printed version of the paper</a> can be found online.</li>
+</ul>
 </div>
 
 <div id="TOC">
+<h2><span class="header-section-number"></span> Table of Contents</h2>
 <ul>
 <li><a href="#table-1-measures-related-to-the-modern-contract"><span class="toc-section-number">1</span> Table 1: Measures Related to the Modern Contract</a></li>
 <li><a href="#table-2-measures-related-to-the-traditional-contract"><span class="toc-section-number">2</span> Table 2: Measures Related to the Traditional Contract</a></li>
@@ -178,21 +185,18 @@ $(document).ready(function () {
 </ul>
 </div>
 
-<ul>
-<li><a href="https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd">This .Rmd file</a> replicates all tables and figures reported in the manuscript <a href="https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full">“<em>Citizen Attitudes towards Modern and Traditional Authority: Substitutes or Complements?</em>”</a>.</li>
-<li>Data comes from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/data">data</a>”. Helper functions are called up in the process from the local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/code">code</a>”. Figures are put into local folder “<a href="https://github.com/medinali/VDW-H-M-T-V/tree/master/output">output</a>”.</li>
-</ul>
-<p><a href="http://www.macartan.nyc/wp-content/uploads/2018/11/VDW-H-M-T-V_paper.pdf">A pre-printed version of the paper</a> can be found online.</p>
 <div id="options" class="section level4">
-<h4><span class="header-section-number"></span> Options</h4>
-<p>Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete.</p>
+<h3><span class="header-section-number"></span> Options</h3>
+<p>Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete. The results from the fitted models can be found <a href="https://www.dropbox.com/sh/1knr88h3m0zagc9/AABcxXXQEqN8RgIx7_1LaO1Ga?dl=0">here</a>. You need to download these files to your local folder whenever <code>run_1re</code> or <code>run_2re</code> are set to FALSE.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Stan Setup</span>
 <span class="co"># 1re: model with random effects at chiefdom level</span>
 <span class="co"># 2re: model with random effects at chiefdom level and village level</span>
 
 seed &lt;-<span class="st"> </span><span class="dv">1</span>
+<span class="co"># Run structural model</span>
 run_1re &lt;-<span class="st"> </span><span class="ot">FALSE</span>
 run_2re &lt;-<span class="st"> </span><span class="ot">FALSE</span>
+<span class="co"># Simulate samples of the posterior predictive distribution</span>
 run_posteriors &lt;-<span class="st"> </span><span class="ot">FALSE</span>
 
 outname_1re &lt;-<span class="st"> &quot;stan_1re.Rdata&quot;</span>
@@ -205,7 +209,7 @@ iters &lt;-<span class="st"> </span><span class="dv">4000</span>
 max_divergent &lt;-<span class="st"> </span><span class="dv">0</span> <span class="co"># Maximum divervent transitions accepted</span></code></pre></div>
 </div>
 <div id="load-data-and-helper-files" class="section level4">
-<h4><span class="header-section-number"></span> Load Data and Helper Files</h4>
+<h3><span class="header-section-number"></span> Load Data and Helper Files</h3>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Load data from the local folder &quot;data&quot;</span>
 <span class="co"># The cleaning process and creation of shock variables has been kept out, </span>
 <span class="co"># as this required village-level GPS information, which cannot be made public.</span>
