@@ -5,10 +5,10 @@ author: 'Authors: Peter van der Windt, Macartan Humphreys, Lily Medina, Jeffrey 
 date: "October 22, 2018"
 output:
   html_document:
+    highlight: tango
     number_sections: yes
     theme: united
     toc: yes
-    toc_depth: 3
   pdf_document:
     number_sections: yes
     toc: yes
@@ -20,8 +20,19 @@ rm(list=ls(all=TRUE))
 gc()
 knitr::opts_chunk$set(echo = TRUE)
 ```
+[This .Rmd file]: https://github.com/medinali/VDW-H-M-T-V/blob/master/Replication.Rmd 
+[data]:
+[code]:
+[output]:
+[online]:
+["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
+  Complements?_"]: https://journals.sagepub.com/eprint/XiYVWJ8hAmTvFk6igcrg/full
+  
+* [This .Rmd file] replicates all tables and figures reported in the manuscript ["_Citizen Attitudes towards Modern and Traditional Authority: Substitutes or
+  Complements?_"].
+* Data comes from the local folder "[data]". Helper functions are called up in the process from the local folder "[code]". Figures are put into local folder "[output]".
 
-This .Rmd file replicates all tables and figures used in the paper. Data comes from the local folder "data". One helper file is called up in the process from the local folder "code". Figures are put into local folder "output".
+You can find
 
 ```{r setup2, include=FALSE}
 
@@ -35,7 +46,7 @@ library(estimatr)
 library(rstan)
 ```
 
-## Options
+#### Options
 
 Indicate your preferences here. Fyi, the structural model (which can be turned on below) takes several hours to complete. 
 
@@ -61,7 +72,7 @@ max_divergent <- 0 # Maximum divervent transitions accepted
 
 ```
 
-## Load Data and Helper Files
+#### Load Data and Helper Files
 
 ```{r prep1, warning=FALSE}
 
@@ -953,7 +964,7 @@ f1
 dev.off()
 f1
 
-  pdf("output/FigA1_Rain.pdf", width = 8, height = 8)
+  png("output/FigA1_Rain.png")
   f1
   dev.off()
 
@@ -1034,7 +1045,7 @@ f2
 dev.off()
 f2
 
-  pdf("output/FigA2_Conflict.pdf", width = 8, height = 8)
+  png("output/FigA2_Conflict.png")
   f2
   dev.off()
 
