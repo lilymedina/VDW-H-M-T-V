@@ -7,6 +7,6 @@
 * *_Replication.Rmd_* replicates tables and figures of the paper
 * *_Replication.md_* displays replicated tables and figures
 * *posterior_rain.Rdata* and *posterior_conflict.Rdata* contain simulated samples of the posterior predictive distribution.
-* the <code>Rdata</code> files tha contain the <code>stanfit </code>objects with the fitted results can be download from [here]
+* the <code>Rdata</code> files tha contain the <code>stanfit </code>objects with the fitted results can be download [here]
 
 
