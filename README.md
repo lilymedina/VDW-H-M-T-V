@@ -1,4 +1,4 @@
-# Replication: van der Windt, Humphreys, Medina, Timmons, and Vors (2018)
+# Replication: van der Windt, Humphreys, Medina, Timmons, and Voors (2018)
 [here]:https://www.dropbox.com/home/Public/stan_objects
 
 * *_\code_* contains all helper functions used in _Replication.Rmd_
