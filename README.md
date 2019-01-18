@@ -2,7 +2,7 @@
 [here]:https://www.dropbox.com/home/Public/stan_objects
 
 * *_\code_* contains all helper functions used in _Replication.Rmd_
-* *_\data_* contains anonimized version of the data loaded in _Replication.Rmd_
+* *_\data_* contains anonymized version of the data loaded in _Replication.Rmd_
 * *_\output_* contains .pdf files produced in _Replication.Rmd_
 * *_Replication.Rmd_* replicates tables of the paper
 * *_Replication.md_* displays replicated tables
